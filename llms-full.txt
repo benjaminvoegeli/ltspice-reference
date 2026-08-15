@@ -2022,12 +2022,11 @@ Small-signal AC analysis linearized about the DC operating point.
 
 ### .DC — DC Sweep
 
-Sweeps DC value of one or more sources. Up to 3 nested sweeps.
+Sweeps the DC value of one or more independent sources. Up to 3 nested sweeps.
 
 ```spice
-.dc <srcnam> <start> <stop> <incr>
-.dc [oct|dec|lin] <srcnam> <start> <stop> <incr>
-.dc <srcnam> list <val1> [<val2> ...]
+.dc [oct|dec|lin] <srcnam> <start> <stop> <incr|points>
+.dc <srcnam> list <val1> <val2> [<val3> ...]
 .dc <srcnam> file=<filename>
 ```
 
@@ -2040,7 +2039,9 @@ Sweeps DC value of one or more sources. Up to 3 nested sweeps.
 ```spice
 .dc V1 0 5 0.1
 .dc Vds 3.5 0 -0.05 Vgs 0 3.5 0.5
-.dc dec R1 1K 1Meg 10
+.dc I1 0 2m 0.1m
+.dc V1 list 1 2.5 5
+.dc dec V1 1 100 10
 ```
 
 ---
@@ -2308,19 +2309,35 @@ Uses dynamic scoping: names resolved where function is called.
 
 ### .STEP — Parameter Sweeps
 
-Repeatedly run analysis while sweeping a parameter. Up to 3 nested levels.
+Repeatedly run analysis while sweeping a parameter. Multiple `.step` directives
+nest, multiplying the run count: *n* two-value sweeps produce 2ⁿ runs.
 
 ```spice
-.step [oct|dec|lin] <item> <start> <end> <incr>
-.step <item> list <val1> [<val2> ...]
+.step [oct|dec|lin] <item> <start> <end> <incr|points>
+.step <item> list <val1> <val2> [<val3> ...]
 .step <item> file=<filename>
 ```
 
 **Item formats**:
-- Source: `V1` or `I1`
-- Parameter: `param RLOAD`
-- Model parameter: `NPN 2N2222(VAF)`
-- Temperature: `temp`
+
+| Item | Syntax | Notes |
+|------|--------|-------|
+| Parameter | `param RLOAD` | The `param` keyword is **required** |
+| Source | `V1` or `I1` | Voltage or current source name |
+| Temperature | `temp` | |
+| Model parameter | `NPN 2N2222(VAF)` | The model **type prefix is required** |
+
+**Rules**:
+
+- **At least two steps are required.** A spec resolving to one step (`list` with
+  one value, duplicate-only values, `start == end`, or a zero increment) is
+  rejected and the simulation does not run at all.
+- **`oct|dec|lin` precedes the item**, and cannot combine with `list`.
+- **The third argument depends on the keyword**: an increment for bare/`lin`, but
+  points *per decade* for `dec` and *per octave* for `oct`.
+- **`list` and `file=` take plain numbers** — suffixes and scientific notation are
+  fine, `{}` expressions are not. A `file=` list may be newline- or
+  space-separated.
 
 **Examples**:
 ```spice
@@ -2330,6 +2347,7 @@ Repeatedly run analysis while sweeping a parameter. Up to 3 nested levels.
 .step temp -40 125 5
 .step NPN 2N2222(BF) 50 200 50
 .step dec param freq 1K 1Meg 10
+.step param Rload file=rvalues.txt
 ```
 
 ---
@@ -2339,7 +2357,7 @@ Repeatedly run analysis while sweeping a parameter. Up to 3 nested levels.
 Archaic shorthand for `.step temp list ...`.
 
 ```spice
-.temp <T1> <T2> ...
+.temp <T1> [<T2> ...]
 ```
 
 **Example**:
@@ -2387,7 +2405,7 @@ Control simulator tolerances, integration method, waveform compression, and diag
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| maxstep | Infinite | Maximum transient step size |
+| maxstep | Tstop/1024 | Maximum transient step size |
 | solver | — | Matrix solver: "norm" or "alt" |
 
 #### Waveform Compression
@@ -2419,7 +2437,7 @@ Control simulator tolerances, integration method, waveform compression, and diag
 | Option | Default | Description |
 |--------|---------|-------------|
 | numdgt | 6 | Significant digits (>6 = double precision) |
-| measdgt | 6 | .MEASURE output digits |
+| measdgt | 12 | .MEASURE output digits |
 | list | off | Expanded netlist in log |
 | logparams | off | All parameters in log |
 | logopinfo | off | Semiconductor OP info in log |
@@ -3031,6 +3049,76 @@ If you can run Windows, you can run LTspice. Significant effort is spent minimiz
 ### Emergency: Running Out of Disk Space
 
 During transient analysis, press the **`0` key** to discard past waveform data and reset the time axis to t=0 at the current simulation time. This frees disk space immediately.
+
+---
+
+## Sweep Directive Errors
+
+These errors are reported before the simulation starts. The run is **abandoned
+entirely** — no `.raw` file is written, so the waveform viewer stays empty and
+there is no partial data to inspect.
+
+### .STEP Rejected Before Simulating
+
+Every `.step` must produce at least two distinct steps. A spec resolving to a
+single step is rejected with one of these messages, which name the offending
+directive and mark the problem with a caret:
+
+| Error Message | Cause | Example |
+|---------------|-------|---------|
+| `This results in only one step.` | `list` given a single value | `.step param Rx list 1k` |
+| `This results in only one step.` | `start` equals `end` | `.step param Rx 1k 1k 1k` |
+| `Only duplicate values listed.` | All `list` values identical | `.step param Rx list 1k 1k` |
+| `Increment must not be zero.` | Zero increment | `.step param Rx 1k 3k 0` |
+| `Expected list numbers here.` | `list` with no values, or `{}` expressions | `.step param Rx list` |
+| `Expected "(" here.` | Missing `param` keyword | `.step Rx 1k 3k 1k` |
+| `Expected number here.` | `oct\|dec\|lin` placed after the item | `.step param Rx dec 1k 100k 10` |
+
+Example output:
+```
+C:\path\to\circuit.net(5): This results in only one step.
+.step param Rx list 1k
+      ^^^^^^^^^^^^^^^^
+```
+
+**Fixes**:
+
+- Give `list` two or more distinct values — a single-value sweep is not a sweep.
+  To run once at a non-default value, use `.param` (or `.temp` for temperature)
+  instead of `.step`.
+- Make `start` and `end` differ, and give a non-zero increment.
+- Add the required `param` keyword: `.step param Rx …`, not `.step Rx …`.
+- Move `oct|dec|lin` before the item: `.step dec param freq …`.
+
+See [SIMULATION-COMMANDS-REFERENCE.md](SIMULATION-COMMANDS-REFERENCE.md#step--parameter-sweeps)
+for the full `.step` grammar.
+
+### .DC Rejected Before Simulating
+
+`.dc` enforces the same two-point minimum, but reports it with different wording
+than `.step`. It also accepts a narrower set of sweep items.
+
+| Error Message | Cause | Example |
+|---------------|-------|---------|
+| `This sweep spec results in only one point.` | Single `list` value, or `start` equal to `stop` | `.dc V1 list 1` |
+| `Only duplicate values listed.` | All `list` values identical | `.dc V1 list 1 1` |
+| `Increment must not be zero.` | Zero increment | `.dc V1 0 2 0` |
+| `Expected list of expressions/numbers here.` | `list` with no values | `.dc V1 list` |
+| `DC sweep source must be an independent source.` | Sweeping a passive component | `.dc R1 1k 3k 1k` |
+| `Expected expression or literal here.` | `param`/model form, or `oct\|dec\|lin` after the source | `.dc param Rx 1k 3k 1k` |
+| `syntax error` | More than 3 nested sweeps | `.dc V1 … V2 … V3 … V4 …` |
+
+**Fixes**:
+
+- Sweep an **independent source** (`V…`/`I…`) or `temp`. To sweep a resistance or
+  a model parameter, use `.step` — `.dc` has no `param` or model-parameter form.
+- Give `list` two or more distinct values, make `start` and `stop` differ, and use
+  a non-zero increment.
+- Place `oct|dec|lin` before the source name: `.dc dec V1 1 100 10`.
+- Keep nested sweeps to 3 or fewer.
+
+See [SIMULATION-COMMANDS-REFERENCE.md](SIMULATION-COMMANDS-REFERENCE.md#dc--dc-sweep)
+for the full `.dc` grammar.
 
 ---
 
