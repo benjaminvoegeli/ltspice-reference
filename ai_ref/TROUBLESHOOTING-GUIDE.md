@@ -26,6 +26,7 @@ Diagnosing and fixing convergence failures, performance issues, and common simul
 10. [Waveform Compression](#waveform-compression)
 11. [Steady-State Detection](#steady-state-detection)
 12. [Memory and Performance](#memory-and-performance)
+13. [Sweep Directive Errors](#sweep-directive-errors)
 
 ---
 
@@ -389,6 +390,76 @@ If you can run Windows, you can run LTspice. Significant effort is spent minimiz
 ### Emergency: Running Out of Disk Space
 
 During transient analysis, press the **`0` key** to discard past waveform data and reset the time axis to t=0 at the current simulation time. This frees disk space immediately.
+
+---
+
+## Sweep Directive Errors
+
+These errors are reported before the simulation starts. The run is **abandoned
+entirely** — no `.raw` file is written, so the waveform viewer stays empty and
+there is no partial data to inspect.
+
+### .STEP Rejected Before Simulating
+
+Every `.step` must produce at least two distinct steps. A spec resolving to a
+single step is rejected with one of these messages, which name the offending
+directive and mark the problem with a caret:
+
+| Error Message | Cause | Example |
+|---------------|-------|---------|
+| `This results in only one step.` | `list` given a single value | `.step param Rx list 1k` |
+| `This results in only one step.` | `start` equals `end` | `.step param Rx 1k 1k 1k` |
+| `Only duplicate values listed.` | All `list` values identical | `.step param Rx list 1k 1k` |
+| `Increment must not be zero.` | Zero increment | `.step param Rx 1k 3k 0` |
+| `Expected list numbers here.` | `list` with no values, or `{}` expressions | `.step param Rx list` |
+| `Expected "(" here.` | Missing `param` keyword | `.step Rx 1k 3k 1k` |
+| `Expected number here.` | `oct\|dec\|lin` placed after the item | `.step param Rx dec 1k 100k 10` |
+
+Example output:
+```
+C:\path\to\circuit.net(5): This results in only one step.
+.step param Rx list 1k
+      ^^^^^^^^^^^^^^^^
+```
+
+**Fixes**:
+
+- Give `list` two or more distinct values — a single-value sweep is not a sweep.
+  To run once at a non-default value, use `.param` (or `.temp` for temperature)
+  instead of `.step`.
+- Make `start` and `end` differ, and give a non-zero increment.
+- Add the required `param` keyword: `.step param Rx …`, not `.step Rx …`.
+- Move `oct|dec|lin` before the item: `.step dec param freq …`.
+
+See [SIMULATION-COMMANDS-REFERENCE.md](SIMULATION-COMMANDS-REFERENCE.md#step--parameter-sweeps)
+for the full `.step` grammar.
+
+### .DC Rejected Before Simulating
+
+`.dc` enforces the same two-point minimum, but reports it with different wording
+than `.step`. It also accepts a narrower set of sweep items.
+
+| Error Message | Cause | Example |
+|---------------|-------|---------|
+| `This sweep spec results in only one point.` | Single `list` value, or `start` equal to `stop` | `.dc V1 list 1` |
+| `Only duplicate values listed.` | All `list` values identical | `.dc V1 list 1 1` |
+| `Increment must not be zero.` | Zero increment | `.dc V1 0 2 0` |
+| `Expected list of expressions/numbers here.` | `list` with no values | `.dc V1 list` |
+| `DC sweep source must be an independent source.` | Sweeping a passive component | `.dc R1 1k 3k 1k` |
+| `Expected expression or literal here.` | `param`/model form, or `oct\|dec\|lin` after the source | `.dc param Rx 1k 3k 1k` |
+| `syntax error` | More than 3 nested sweeps | `.dc V1 … V2 … V3 … V4 …` |
+
+**Fixes**:
+
+- Sweep an **independent source** (`V…`/`I…`) or `temp`. To sweep a resistance or
+  a model parameter, use `.step` — `.dc` has no `param` or model-parameter form.
+- Give `list` two or more distinct values, make `start` and `stop` differ, and use
+  a non-zero increment.
+- Place `oct|dec|lin` before the source name: `.dc dec V1 1 100 10`.
+- Keep nested sweeps to 3 or fewer.
+
+See [SIMULATION-COMMANDS-REFERENCE.md](SIMULATION-COMMANDS-REFERENCE.md#dc--dc-sweep)
+for the full `.dc` grammar.
 
 ---
 
