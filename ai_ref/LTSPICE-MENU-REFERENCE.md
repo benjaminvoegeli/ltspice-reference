@@ -192,6 +192,22 @@ Within each menu, underlined letters (mnemonics) can be pressed directly without
 - **Edit Plot Defs File**
 
 
+### Notes & Annotations Submenu (Waveform Viewer)
+
+- **Label Curs. Pos.** — Place a label showing the current cursor position
+- **Annotate Phase Margin** — Annotate the phase margin on the plot
+- **Annotate Gain Margin** — Annotate the gain margin on the plot
+- **Annotate Steps** — Show a legend identifying the stepped parameter runs
+- **Place Text** — Add a free-form text note to the plot
+- **Draw Arrow** — Draw an arrow annotation
+- **Draw Line** — Draw a straight line annotation
+- **Draw Box** — Draw a rectangle annotation
+- **Draw Ellipse** — Draw an ellipse annotation
+- **Line Style/Color** — Set line style and color used for annotations
+- **Move** — Move an existing annotation
+- **Stretch** — Stretch/resize an existing annotation
+
+
 
 ## Window Menu - Available when any window is open
 
