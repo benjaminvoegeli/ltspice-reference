@@ -39,6 +39,7 @@ Complete reference for all circuit element types in LTspice, including syntax, p
 23. [A — Special Functions](#a--special-functions)
 24. [X — Subcircuit](#x--subcircuit)
 25. [@ — Frequency Response Analyzer](#--frequency-response-analyzer)
+26. [& — Frequency Response Analysis Probe](#--frequency-response-analysis-probe)
 
 ---
 
@@ -934,7 +935,22 @@ When you do raise it:
 ### Alternate Measurement Nodes
 
 - **`refnode`** — measures the `in` and `out` node voltages relative to `refnode` instead of ground. This allows FRA to be used on, for example, circuits that regulate current via the voltage across a sense resistor. Not applicable to impedance analysis.
-- **`intnode`** — specifies an intermediate node for an additional gain analysis, useful for analyzing the external compensation point of a regulator. Gain is calculated from the FRA device to `intnode`, and the complex value is included in the raw output file so it can be plotted in the waveform viewer.
+
+  **The [`&` probe device](#--frequency-response-analysis-probe) is generally preferred over `refnode`.** Both address the same differential-feedback cases, but the probe takes an explicit differential pair at each end (`o+`/`o-` and `i+`/`i-`) instead of redefining the reference for the analyzer's own terminals, and it adds measurement points without altering how the loop is broken.
+- **`intnode`** — specifies an intermediate node for an additional gain analysis, useful for analyzing the external compensation point of a regulator. Gain is calculated from the FRA device to `intnode`, and the complex value is included in the raw output file so it can be plotted in the waveform viewer. To measure gain between arbitrary *differential* point pairs rather than to a single node, use the [`&` probe device](#--frequency-response-analysis-probe).
+
+### Results and Bode Plot
+
+When simulated in the GUI, LTspice opens a Bode plot and may populate it automatically — but only in two configurations, which depend both on the FRA device's terminals and on how many [`&` probes](#--frequency-response-analysis-probe) are in the circuit:
+
+| FRA device terminals | `&` probes in circuit | Auto-plotted trace |
+|----------------------|-----------------------|--------------------|
+| Neither grounded | none | one trace per `@` FRA device |
+| One grounded | exactly one | that probe's trace |
+| Neither grounded | one or more | none — blank Bode plot |
+| One grounded | none, or more than one | none — blank Bode plot |
+
+A blank Bode plot does not mean the analysis failed: the results are in the raw output file either way, and the traces can be added manually. Check the FRA device's terminals and the probe count against the table above before looking for a problem in the circuit.
 
 ### Parameters
 
@@ -961,6 +977,37 @@ When you do raise it:
 | enabled | Analyzer enable (0 or 1) | — | 1 |
 | refnode | Reference node for voltage gain analysis | — | 0 |
 | intnode | Intermediate node for additional gain analysis | — | — |
+
+---
+
+## & — Frequency Response Analysis Probe
+
+**Symbols**: FRAPROBE
+
+```spice
+&xxx o+ o- i+ i-
+```
+
+Used in conjunction with an [`@` Frequency Response Analyzer](#--frequency-response-analyzer) during a [`.fra`](SIMULATION-COMMANDS-REFERENCE.md#fra--frequency-response-analysis) simulation, the probe analyzes gain between any two differential points. It accepts no control parameters — the stimulus is controlled entirely by the FRA device.
+
+**Result**: the complex quantity `V(o+,o-) / V(i+,i-)` versus frequency, written to the FRA complex raw output file `<circuit>.fra_<fra_instance_name>.raw` as a signal named `probe_<fraprobe_instance_name>`. Whether that signal is plotted automatically depends on the FRA device's terminals and how many probes are present — see [Results and Bode Plot](#results-and-bode-plot).
+
+The differential input and output pairs suit applications such as the following, each with an example schematic in **File > Open Examples > Educational\FRA\**:
+
+- SMPS micromodules with integrated top feedback resistors — `fra_eg8_ltm8074_probe.asc`
+- Analyzing the gain of an intermediate portion of a control loop — for example from the compensation point of an SMPS to the output, known as the modulator gain — `&mod` in `fra_eg6_LT3763_probe_current.asc`, which measures from the compensation point VC to the output current sense
+- Differential feedback, such as current-feedback circuits — `&1` in the same example, taken differentially across the output current sense resistor
+- Inverting (negative output) SMPS circuits — `fra_eg10_LT8609_inverting_probe.asc`
+
+For differential feedback, prefer this device over the FRA device's [`refnode`](#--frequency-response-analyzer) parameter.
+
+### Multiple Loops and Probes
+
+A circuit with more than one feedback loop can have its loops analyzed simultaneously by configuring a separate FRA device for each independent loop.
+
+Probes may also be used in simulations with multiple FRA devices, but **each probe must be associated with a specific FRA device, and LTspice makes that association by instance name** — `&1` pairs with `@1`, `&2` with `@2`, and so on.
+
+**Examples**: in that same directory, any schematic with "probe" in the filename demonstrates the probe device.
 
 ---
 

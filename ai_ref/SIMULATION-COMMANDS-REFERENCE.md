@@ -218,7 +218,7 @@ DC small-signal transfer function analysis.
 
 ### .FRA — Frequency Response Analysis
 
-Time-domain frequency response analysis for feedback loops (e.g., SMPS stability). Requires an FRA device instance (prefix `@`) — the sweep range, stimulus amplitude and timing are all set on that device, not on this command. See [CIRCUIT-ELEMENTS-REFERENCE.md](CIRCUIT-ELEMENTS-REFERENCE.md#--frequency-response-analyzer) for its parameters.
+Time-domain frequency response analysis for feedback loops (e.g., SMPS stability). Requires an FRA device instance (prefix `@`) — the sweep range, stimulus amplitude and timing are all set on that device, not on this command. See [CIRCUIT-ELEMENTS-REFERENCE.md](CIRCUIT-ELEMENTS-REFERENCE.md#--frequency-response-analyzer) for its parameters. Optional [FRA probe devices](CIRCUIT-ELEMENTS-REFERENCE.md#--frequency-response-analysis-probe) (prefix `&`) add differential measurement points to the same run, and a circuit with multiple independent loops can use one FRA device per loop.
 
 ```spice
 .fra [Tstart=<val>] [dTmax=<val>] [Tstep=<val>] [Tstop=<val>]
@@ -311,6 +311,14 @@ Post-processing command to extract measurements from simulation results.
 3. Execute **Plot .step'ed .meas data** from the context menu
 
 This plots the `.MEAS` results as waveforms indexed by step parameter value.
+
+**Running .MEAS on an existing dataset (no re-simulation)**: `.meas` statements are
+evaluated entirely in post processing, so a script of them can be executed against
+waveform data already on disk. Make the **waveform window** the active window, then use
+**File > Execute .MEAS Script**. This avoids re-running the simulation just to add or
+change a measurement. The script file may be an ordinary netlist — everything except the
+`.meas` statements is ignored, so the circuit's own `.net`/`.cir` file can be used
+directly.
 
 ---
 

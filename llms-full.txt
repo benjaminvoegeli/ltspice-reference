@@ -689,6 +689,9 @@ Within each menu, underlined letters (mnemonics) can be pressed directly without
   - Resistor
 - **Save** (Ctrl+S) — Save current file
 - **Save As...** (Ctrl+Shift+S) — Save with new filename
+- **Execute .MEAS Script** — Run a script of `.MEAS` statements against the displayed
+  waveform data, without re-simulating. Requires the **waveform window** to be the
+  active window.
 - **Close** (Ctrl+W) — Close current file
 - **Print** (Ctrl+P)
 - **Print Preview** (V)
@@ -2013,7 +2016,22 @@ When you do raise it:
 ### Alternate Measurement Nodes
 
 - **`refnode`** — measures the `in` and `out` node voltages relative to `refnode` instead of ground. This allows FRA to be used on, for example, circuits that regulate current via the voltage across a sense resistor. Not applicable to impedance analysis.
-- **`intnode`** — specifies an intermediate node for an additional gain analysis, useful for analyzing the external compensation point of a regulator. Gain is calculated from the FRA device to `intnode`, and the complex value is included in the raw output file so it can be plotted in the waveform viewer.
+
+  **The [`&` probe device](#--frequency-response-analysis-probe) is generally preferred over `refnode`.** Both address the same differential-feedback cases, but the probe takes an explicit differential pair at each end (`o+`/`o-` and `i+`/`i-`) instead of redefining the reference for the analyzer's own terminals, and it adds measurement points without altering how the loop is broken.
+- **`intnode`** — specifies an intermediate node for an additional gain analysis, useful for analyzing the external compensation point of a regulator. Gain is calculated from the FRA device to `intnode`, and the complex value is included in the raw output file so it can be plotted in the waveform viewer. To measure gain between arbitrary *differential* point pairs rather than to a single node, use the [`&` probe device](#--frequency-response-analysis-probe).
+
+### Results and Bode Plot
+
+When simulated in the GUI, LTspice opens a Bode plot and may populate it automatically — but only in two configurations, which depend both on the FRA device's terminals and on how many [`&` probes](#--frequency-response-analysis-probe) are in the circuit:
+
+| FRA device terminals | `&` probes in circuit | Auto-plotted trace |
+|----------------------|-----------------------|--------------------|
+| Neither grounded | none | one trace per `@` FRA device |
+| One grounded | exactly one | that probe's trace |
+| Neither grounded | one or more | none — blank Bode plot |
+| One grounded | none, or more than one | none — blank Bode plot |
+
+A blank Bode plot does not mean the analysis failed: the results are in the raw output file either way, and the traces can be added manually. Check the FRA device's terminals and the probe count against the table above before looking for a problem in the circuit.
 
 ### Parameters
 
@@ -2040,6 +2058,37 @@ When you do raise it:
 | enabled | Analyzer enable (0 or 1) | — | 1 |
 | refnode | Reference node for voltage gain analysis | — | 0 |
 | intnode | Intermediate node for additional gain analysis | — | — |
+
+---
+
+## & — Frequency Response Analysis Probe
+
+**Symbols**: FRAPROBE
+
+```spice
+&xxx o+ o- i+ i-
+```
+
+Used in conjunction with an [`@` Frequency Response Analyzer](#--frequency-response-analyzer) during a [`.fra`](SIMULATION-COMMANDS-REFERENCE.md#fra--frequency-response-analysis) simulation, the probe analyzes gain between any two differential points. It accepts no control parameters — the stimulus is controlled entirely by the FRA device.
+
+**Result**: the complex quantity `V(o+,o-) / V(i+,i-)` versus frequency, written to the FRA complex raw output file `<circuit>.fra_<fra_instance_name>.raw` as a signal named `probe_<fraprobe_instance_name>`. Whether that signal is plotted automatically depends on the FRA device's terminals and how many probes are present — see [Results and Bode Plot](#results-and-bode-plot).
+
+The differential input and output pairs suit applications such as the following, each with an example schematic in **File > Open Examples > Educational\FRA\**:
+
+- SMPS micromodules with integrated top feedback resistors — `fra_eg8_ltm8074_probe.asc`
+- Analyzing the gain of an intermediate portion of a control loop — for example from the compensation point of an SMPS to the output, known as the modulator gain — `&mod` in `fra_eg6_LT3763_probe_current.asc`, which measures from the compensation point VC to the output current sense
+- Differential feedback, such as current-feedback circuits — `&1` in the same example, taken differentially across the output current sense resistor
+- Inverting (negative output) SMPS circuits — `fra_eg10_LT8609_inverting_probe.asc`
+
+For differential feedback, prefer this device over the FRA device's [`refnode`](#--frequency-response-analyzer) parameter.
+
+### Multiple Loops and Probes
+
+A circuit with more than one feedback loop can have its loops analyzed simultaneously by configuring a separate FRA device for each independent loop.
+
+Probes may also be used in simulations with multiple FRA devices, but **each probe must be associated with a specific FRA device, and LTspice makes that association by instance name** — `&1` pairs with `@1`, `&2` with `@2`, and so on.
+
+**Examples**: in that same directory, any schematic with "probe" in the filename demonstrates the probe device.
 
 ---
 
@@ -2224,7 +2273,7 @@ DC small-signal transfer function analysis.
 
 ### .FRA — Frequency Response Analysis
 
-Time-domain frequency response analysis for feedback loops (e.g., SMPS stability). Requires an FRA device instance (prefix `@`) — the sweep range, stimulus amplitude and timing are all set on that device, not on this command. See [CIRCUIT-ELEMENTS-REFERENCE.md](CIRCUIT-ELEMENTS-REFERENCE.md#--frequency-response-analyzer) for its parameters.
+Time-domain frequency response analysis for feedback loops (e.g., SMPS stability). Requires an FRA device instance (prefix `@`) — the sweep range, stimulus amplitude and timing are all set on that device, not on this command. See [CIRCUIT-ELEMENTS-REFERENCE.md](CIRCUIT-ELEMENTS-REFERENCE.md#--frequency-response-analyzer) for its parameters. Optional [FRA probe devices](CIRCUIT-ELEMENTS-REFERENCE.md#--frequency-response-analysis-probe) (prefix `&`) add differential measurement points to the same run, and a circuit with multiple independent loops can use one FRA device per loop.
 
 ```spice
 .fra [Tstart=<val>] [dTmax=<val>] [Tstep=<val>] [Tstop=<val>]
@@ -2317,6 +2366,19 @@ Post-processing command to extract measurements from simulation results.
 3. Execute **Plot .step'ed .meas data** from the context menu
 
 This plots the `.MEAS` results as waveforms indexed by step parameter value.
+
+**Running .MEAS on an existing dataset (no re-simulation)**: `.meas` statements are
+evaluated entirely in post processing, so a script of them can be executed against
+waveform data already on disk. Make the **waveform window** the active window, then use
+**File > Execute .MEAS Script**. This avoids re-running the simulation just to add or
+change a measurement. The script file may be an ordinary netlist — everything except the
+`.meas` statements is ignored, so the circuit's own `.net`/`.cir` file can be used
+directly.
+
+**Accuracy caveat**: because `.meas` reads the saved waveform data, its accuracy is
+limited by that data *after* compression. Disable or loosen compression
+(`.options plotwinsize=0`) for more precise `.meas` output — see
+[Waveform Compression](#waveform-compression).
 
 ---
 
@@ -2803,7 +2865,7 @@ Diagnosing and fixing convergence failures, performance issues, and common simul
 
 ## Diagnostic Information Collection
 
-When troubleshooting LTspice issues (especially FRA, convergence, or model-related problems), collect this diagnostic information first:
+When troubleshooting LTspice issues (especially [FRA](#blank-bode-plot-after-fra), convergence, or model-related problems), collect this diagnostic information first:
 
 ### 1. LTspice Version
 - Go to **Help → About LTspice**
@@ -3084,6 +3146,8 @@ Turn off compression (`plotwinsize=0`) when:
 - Using `.four` statements
 - Doing FFT in post-analysis
 - Need exact sample-by-sample data
+- Precise `.meas` results are required — `.meas` runs in post processing on the saved
+  waveform data, so its accuracy is limited by that data after compression
 
 ```spice
 .options plotwinsize=0
@@ -3231,6 +3295,28 @@ than `.step`. It also accepts a narrower set of sweep items.
 
 See [SIMULATION-COMMANDS-REFERENCE.md](SIMULATION-COMMANDS-REFERENCE.md#dc--dc-sweep)
 for the full `.dc` grammar.
+
+---
+
+## Blank Bode Plot After .FRA
+
+Unlike the sweep errors above, a blank Bode plot usually means the run **succeeded**.
+The results are in `<circuit>.fra_<fra_instance_name>.raw`; only the automatic trace
+selection declined to pick anything.
+
+LTspice auto-plots a trace in just two configurations, and every other combination of
+grounded FRA terminal and probe count leaves the plot blank. Check the `@` device's
+terminals and the number of `&` probes against the
+[auto-plot table](CIRCUIT-ELEMENTS-REFERENCE.md#--frequency-response-analyzer), then add
+what you need by hand with **View > Add Trace** (A) — the FRA device's own trace, or
+`probe_<fraprobe_instance_name>` for a probe.
+
+**The other FRA failure mode looks nothing like this.** A Bode plot that appears complete
+and plausible can still be wrong — when `delay`, stimulus amplitude, `tsettle`, or
+`tavgmin` are misset, or when the FRA device does not interrupt every feedback path.
+Nothing reports it. Work through
+[SMPS Bode Plots (FRA)](FAQ-AND-TIPS.md#smps-bode-plots-fra) in order rather than trusting
+the first plot that appears.
 
 ---
 
@@ -4595,6 +4681,32 @@ Each pane has independent autoscaling.
 
 ---
 
+## Executing .MEAS Scripts
+
+`.MEAS` statements are evaluated in post processing on the saved waveform dataset, so
+they can be run against data already on disk — **no re-simulation required**.
+
+**Menu**: With the waveform window active, **File > Execute .MEAS Script**
+
+This runs a script of `.MEAS` statements against the displayed dataset and writes the
+results to the log (**View > SPICE Output Log**, Ctrl+L). Use it to add or revise
+measurements after a long run, or to iterate on measurement expressions against a fixed
+dataset.
+
+**Script file**: can be a plain netlist — LTspice reads only the `.MEAS` statements and
+ignores every other line, so the circuit's own `.net` or `.cir` file works as-is.
+
+**Accuracy**: results are limited by the accuracy of the waveform data *after*
+compression. Disable compression for precise measurements:
+
+```spice
+.options plotwinsize=0   ; disable compression
+```
+
+*See [MEAS-REFERENCE.md](MEAS-REFERENCE.md) for `.MEAS` syntax and examples.*
+
+---
+
 ## Color Control
 
 **Menu**: Tools > Color Preferences
@@ -5174,6 +5286,35 @@ conn.close()
 This document contains `.MEAS` statement examples for various simulation types.
 
 `.MEAS` results appear in the SPICE Output Log (View → SPICE Output Log, or CTRL+L)
+
+## How .MEAS Statements Are Executed
+
+`.MEAS` statements are evaluated in **post processing**, after the simulation has
+completed — they operate on the saved waveform dataset, not on the running simulation.
+
+### Running a .MEAS Script Without Re-Simulating
+
+Because measurements are pure post processing, you can write `.MEAS`
+statements and execute them against an existing dataset:
+
+1. Make the **waveform window** the active window
+2. Execute menu command **File > Execute .MEAS Script**
+
+This re-measures the waveform data already on disk, so there is no need to re-run the
+simulation to add or change a measurement. Useful for long transient runs, and for
+iterating on measurement expressions against a fixed dataset.
+
+**The script can be an ordinary netlist.** LTspice ignores everything in the file except
+the `.MEAS` statements — component lines, other dot commands, and the title line are all
+skipped. So you can point **Execute .MEAS Script** straight at the circuit's own `.net`
+or `.cir` file: edit or add `.MEAS` lines there, execute the script, and read the new
+results without touching the simulation.
+
+The usual alternative is to place `.MEAS` statements on the schematic as a SPICE
+directive (or in the netlist alongside the other simulation commands), in which case
+they run automatically at the end of each simulation.
+
+
 
 ## .MEAS with AC Analysis - Key Functions
 
