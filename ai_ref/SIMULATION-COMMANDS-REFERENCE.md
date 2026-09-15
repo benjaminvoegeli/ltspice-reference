@@ -218,7 +218,7 @@ DC small-signal transfer function analysis.
 
 ### .FRA — Frequency Response Analysis
 
-Time-domain frequency response analysis for feedback loops (e.g., SMPS stability). Requires FRA device instance (prefix `@`).
+Time-domain frequency response analysis for feedback loops (e.g., SMPS stability). Requires an FRA device instance (prefix `@`) — the sweep range, stimulus amplitude and timing are all set on that device, not on this command. See [CIRCUIT-ELEMENTS-REFERENCE.md](CIRCUIT-ELEMENTS-REFERENCE.md#--frequency-response-analyzer) for its parameters.
 
 ```spice
 .fra [Tstart=<val>] [dTmax=<val>] [Tstep=<val>] [Tstop=<val>]
@@ -226,6 +226,8 @@ Time-domain frequency response analysis for feedback loops (e.g., SMPS stability
 ```
 
 All parameters optional, specified by keyword. FRA automatically stops when all FRA devices complete analysis.
+
+**Follow the step-by-step procedure in [SMPS Bode Plots (FRA)](FAQ-AND-TIPS.md#smps-bode-plots-fra)** rather than configuring the analysis from scratch. A valid measurement depends on device settings that have to be established in order — a `delay` long enough to reach steady state, a stimulus amplitude that does not disturb the operating point, and adequate settling and averaging time at each frequency. Misset, they yield a plausible-looking Bode plot that is simply wrong.
 
 See: File > Open Examples > Educational\FRA\
 

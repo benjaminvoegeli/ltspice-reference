@@ -38,6 +38,7 @@ Complete reference for all circuit element types in LTspice, including syntax, p
 22. [B — Behavioral Source](#b--behavioral-source)
 23. [A — Special Functions](#a--special-functions)
 24. [X — Subcircuit](#x--subcircuit)
+25. [@ — Frequency Response Analyzer](#--frequency-response-analyzer)
 
 ---
 
@@ -866,6 +867,100 @@ In the example above, the mapping is:
 | `IN` | EN/UV |
 
 Because `;§pnba` is introduced by `;`, it is an ordinary comment and is ignored by the simulator — it exists purely to preserve the symbol pin names alongside the net assignments.
+
+---
+
+## @ — Frequency Response Analyzer
+
+**Symbols**: FRA
+
+```spice
+@xxx in out [zm] fstart=<val> fend=<val> [delay=<val>] [oct=<val>] [fcoarse=<val>]
++ [nmax=<val>] [[pp0=<val>] [[pp1=<val>] [f0=<val> f1=<val>]]] [tavgmin=<val>]
++ [tsettle=<val>] [rpar=<val>] [flist=<values>] [acmag=<val>] [acphase=<val>]
++ [refnode=<netname>] [intnode=<netname>]
+```
+
+During a [`.fra`](SIMULATION-COMMANDS-REFERENCE.md#fra--frequency-response-analysis) simulation, the analyzer applies a range of sinusoidal stimuli and measures the circuit response. Used to analyze loop gain versus frequency or impedance versus frequency. For a step-by-step procedure using this device, see [SMPS Bode Plots (FRA)](FAQ-AND-TIPS.md#smps-bode-plots-fra).
+
+**Analysis mode**:
+
+- Default — **gain analysis**: applies voltage stimuli and analyzes the absolute voltage at each terminal.
+- With the `zm` keyword — **impedance analysis**: applies current stimuli and analyzes the voltage *across* the terminals.
+
+**Example**:
+```spice
+@1 A B delay=1m fstart=1k fend=500k oct=1 fcoarse=10k nmax=1 pp0=2m pp1=1m f0=1k f1=2k tavgmin=100u tsettle=200u
+```
+
+### Analysis Frequencies
+
+Frequency is stepped from `fstart` to `fend` at a resolution set by `oct`, the number of points per octave — `oct=1` doubles the stimulus frequency at every step.
+
+`fcoarse` forces coarse stepping (*maximum* one point per octave, `oct<=1`) below the given frequency; the `oct` setting then applies only above it. Setting `fcoarse` to 2–10× `fstart` can greatly reduce simulation time.
+
+`flist` applies a list of specific frequencies individually instead of sweeping.
+
+### Stimulus Amplitude
+
+Amplitude may be specified by one of three methods:
+
+| Method | Behavior |
+|--------|----------|
+| `pp0` alone | Sets one stimulus amplitude across all frequencies. |
+| `pp0`, `pp1`, `f0`, `f1` | Amplitude is `pp0` up to `f0`, `pp1` above `f1`, and logarithmically interpolated between `(f0, pp0)` and `(f1, pp1)`. **Recommended for most circuits.** |
+| `pp` | Piecewise logarithmic amplitude vs. frequency, as space-delimited frequency-voltage pairs. `pp=1k 10m 10k 1m` is equivalent to `f0=1k pp0=10m f1=10k pp1=1m`. |
+
+Typically `pp0 > pp1` — a larger stimulus at low frequencies, where high loop gain suppresses the injected perturbation, and a smaller one at high frequencies, where the loop no longer attenuates it and too much drive would disturb the operating point.
+
+### Simultaneous Harmonic Injection
+
+To reduce simulation time, the FRA device may inject a sinusoid and several of its harmonics simultaneously. `nmax` sets the maximum number of overlaid simultaneous sinusoids per stimulus, given either as an integer or as piecewise-logarithmic frequency-value pairs.
+
+**`nmax` defaults to 1 (no harmonic injection), and generally should be left there.** Injecting harmonics alongside the fundamental means any harmonic distortion the circuit itself produces lands on exactly the frequencies being measured, where it cannot be distinguished from the real response. Raise `nmax` above 1 only when you are specifically trying to speed up a simulation whose setup is already known to be good — never while still validating a measurement.
+
+When you do raise it:
+
+- Higher `nmax` reduces simulation time but may reduce accuracy; `nmax=2` is a reasonable first step, and beyond `nmax=4` there is generally little further benefit.
+- LTspice automatically scales the total amplitude to the specified `pp*` value.
+- Compare the result against an `nmax=1` run to confirm the speed-up has not changed the answer.
+
+### Timing
+
+- **`tavgmin`** — minimum time each sinusoid is analyzed. For each applied frequency, if `1/f < tavgmin`, the analysis time is increased in integer period increments until it exceeds `tavgmin`. For an SMPS, a good starting point is `100/fsw`, where `fsw` is the switching frequency.
+- **`tsettle`** — time between a stimulus first being applied and analysis beginning. A good starting point is `2/fcross`, where `fcross` is the approximate expected 0 dB crossover frequency. Defaults to `10/fend`.
+- **`delay`** — time at which the analyzer applies its first stimulus. Set it long enough for the circuit to reach steady state before stimulus begins: measuring during start-up or while the output is still settling perturbs an operating point that is itself still moving, giving a meaningless loop gain. Determine the settling time from the plain `.tran` run of Step 1 in the [SMPS Bode plot procedure](FAQ-AND-TIPS.md#smps-bode-plots-fra) and set `delay` beyond it.
+
+### Alternate Measurement Nodes
+
+- **`refnode`** — measures the `in` and `out` node voltages relative to `refnode` instead of ground. This allows FRA to be used on, for example, circuits that regulate current via the voltage across a sense resistor. Not applicable to impedance analysis.
+- **`intnode`** — specifies an intermediate node for an additional gain analysis, useful for analyzing the external compensation point of a regulator. Gain is calculated from the FRA device to `intnode`, and the complex value is included in the raw output file so it can be plotted in the waveform viewer.
+
+### Parameters
+
+| Parameter | Description | Units | Default |
+|-----------|-------------|-------|---------|
+| delay | Stimulus start time | sec | 0 |
+| fstart | Frequency sweep start value | Hz | — |
+| fend | Frequency sweep end value | Hz | — |
+| oct | Points per octave for sweep resolution. Supported values: 0.25, 0.5, 1, 2, 3, 4 | — | 4 |
+| fcoarse | Upper frequency for coarse stepping in the sweep | Hz | — |
+| flist | List of specific frequencies (applied individually) | Hz | — |
+| nmax | Maximum number of simultaneously injected harmonic frequencies | — | 1 |
+| pp0 | Stimulus amplitude for frequencies below `f0` (if specified) | V (gain) / A (impedance) | 1mV (gain) / 10mA (impedance) |
+| pp1 | Stimulus amplitude for frequencies above `f1` | V (gain) / A (impedance) | — |
+| f0 | Maximum frequency for `pp0` | Hz | — |
+| f1 | Minimum frequency for `pp1` | Hz | — |
+| pp | Piecewise logarithmic amplitude vs. frequency | Hz,V pairs | — |
+| tavgmin | Minimum analysis time for each stimulus frequency | sec | 0 |
+| tsettle | Settling time at each frequency before analysis begins | sec | 10/fend |
+| rpar | Parallel resistance | Ohm | 1m (gain) / 1T (impedance) |
+| acmag | AC current magnitude (`.ac` simulations only) | A | 0 |
+| acphase | AC current phase (`.ac` simulations only) | degrees | 0 |
+| ac | AC current magnitude, phase pair (`.ac` simulations only) | A,degrees | 0,0 |
+| enabled | Analyzer enable (0 or 1) | — | 1 |
+| refnode | Reference node for voltage gain analysis | — | 0 |
+| intnode | Intermediate node for additional gain analysis | — | — |
 
 ---
 
