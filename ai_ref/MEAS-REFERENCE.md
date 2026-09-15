@@ -1,6 +1,6 @@
 ---
 title: LTspice .MEAS Statement Reference
-description: .MEAS statement examples for AC, noise, transient, and DC analysis — extracting measurements from simulations.
+description: .MEAS statement examples for AC and noise analysis — complete netlists paired with the log output they produce.
 version: "24+"
 ---
 
@@ -778,6 +778,9 @@ low_freq_noise_density: V(onoise) =1.47854748889e-07 at 1
 - **At 1 Hz**: 1/f noise dominates with corner at Enk = 100 Hz, increasing total noise to ~148 nV/√Hz
 - All noise sources are referred to output
 
+---
+
+*See also: [SIMULATION-COMMANDS-REFERENCE.md](SIMULATION-COMMANDS-REFERENCE.md) for `.MEASURE` syntax and the full range of measurement keywords, [MEASURE-DATABASE-REFERENCE.md](MEASURE-DATABASE-REFERENCE.md) for querying `.STEP`'ed results from the SQLite `.db` file*
 ---
 
 *Documentation source: [github.com/analogdevicesinc/ltspice-reference](https://github.com/analogdevicesinc/ltspice-reference)*

@@ -83,7 +83,7 @@ LTspice.exe "C:\Projects\MyCircuit\filter.asc"
 | [WAVEFORM-VIEWER-GUIDE.md](WAVEFORM-VIEWER-GUIDE.md) | Viewing results, probing, arithmetic, FFT, export |
 | [DEVICE-MODELS-GUIDE.md](DEVICE-MODELS-GUIDE.md) | MOSFET/inductor/opamp models, third-party integration |
 | [MEASURE-DATABASE-REFERENCE.md](MEASURE-DATABASE-REFERENCE.md) | .MEAS SQLite database schema, querying results |
-| [MEAS-REFERENCE.md](MEAS-REFERENCE.md) | .MEAS statement examples for AC, transient, and DC analysis |
+| [MEAS-REFERENCE.md](MEAS-REFERENCE.md) | .MEAS examples for AC and noise, with expected log output |
 | [FAQ-AND-TIPS.md](FAQ-AND-TIPS.md) | Updates, license, Linux, efficiency, SMPS Bode plots |
 | [ADI-DESIGN-TOOLS-REFERENCE.md](ADI-DESIGN-TOOLS-REFERENCE.md) | ADI upstream design tools (Signal Chain Designer, Filter Wizard, Photodiode Wizard, ADC Driver Tool, LTpowerCAD) that export LTspice schematics |
 
@@ -2284,6 +2284,31 @@ All parameters optional, specified by keyword. FRA automatically stops when all 
 
 **Follow the step-by-step procedure in [SMPS Bode Plots (FRA)](FAQ-AND-TIPS.md#smps-bode-plots-fra)** rather than configuring the analysis from scratch. A valid measurement depends on device settings that have to be established in order — a `delay` long enough to reach steady state, a stimulus amplitude that does not disturb the operating point, and adequate settling and averaging time at each frequency. Misset, they yield a plausible-looking Bode plot that is simply wrong.
 
+**Measurements on FRA data**: an `.fra` run *is* a transient run — its `.raw` file reports
+`Transient Analysis` with `time` as the x-axis — so `.meas TRAN` statements placed in the
+circuit work directly, alongside the frequency-response results. No separate `.tran`
+simulation is needed to get ripple, overshoot, or average figures out of the same run.
+
+Window the measurement, though. With no range given it spans the whole FRA sweep, which is
+dominated by the stimulus the FRA device injects; use `FROM`/`TO` (or `TRIG`/`TARG`) to
+restrict it. The interval before the device's `delay` is still unperturbed.
+
+```spice
+.meas TRAN vout_pp   PP V(out)                 ; whole sweep — includes FRA stimulus
+.meas TRAN quiescent PP V(out) FROM 0 TO 100u  ; before delay=100u — stimulus not yet applied
+```
+
+**`.meas AC` does not work on FRA results.** Every `.meas` statement in an FRA circuit is
+evaluated against the transient data, so a `.meas AC` directive on an FRA schematic is
+**silently discarded** — it produces no result, no warning, and no mention of the
+measurement name anywhere in the log. There is no way to measure the frequency-domain
+(Bode) data from a directive in the circuit.
+
+To measure the Bode data, run the measurements against the FRA plot from the waveform
+window instead: make the FRA plot the active window and use **File > Execute .MEAS
+Script** (see [.MEASURE](#measure--user-defined-measurements)). That is the only route to
+`.meas` results on the frequency response LTspice extracts from the time-domain run.
+
 See: File > Open Examples > Educational\FRA\
 
 ---
@@ -2355,6 +2380,8 @@ Post-processing command to extract measurements from simulation results.
 .meas AC BW TRIG mag(V(out))=tmp/sqrt(2) RISE=1 TARG mag(V(out))=tmp/sqrt(2) FALL=LAST
 .meas NOISE total_noise INTEG V(onoise)
 ```
+
+**Worked examples**: [MEAS-REFERENCE.md](MEAS-REFERENCE.md) has complete netlists paired with the log output they produce, covering AC and noise measurements in depth.
 
 **Output**: Results in .log file. With `.step`, results form tables. Data saved to SQLite `.db` file (see [MEASURE-DATABASE-REFERENCE.md](MEASURE-DATABASE-REFERENCE.md)).
 
@@ -5271,7 +5298,7 @@ conn.close()
 
 ---
 
-*See also: [SIMULATION-COMMANDS-REFERENCE.md](SIMULATION-COMMANDS-REFERENCE.md) for .MEASURE syntax and examples*
+*See also: [SIMULATION-COMMANDS-REFERENCE.md](SIMULATION-COMMANDS-REFERENCE.md) for .MEASURE syntax and examples, [MEAS-REFERENCE.md](MEAS-REFERENCE.md) for worked .MEAS examples including `.STEP`'ed measurement output*
 ---
 
 *Documentation source: [github.com/analogdevicesinc/ltspice-reference](https://github.com/analogdevicesinc/ltspice-reference)*
@@ -6045,6 +6072,9 @@ low_freq_noise_density: V(onoise) =1.47854748889e-07 at 1
 - **At 1 Hz**: 1/f noise dominates with corner at Enk = 100 Hz, increasing total noise to ~148 nV/√Hz
 - All noise sources are referred to output
 
+---
+
+*See also: [SIMULATION-COMMANDS-REFERENCE.md](SIMULATION-COMMANDS-REFERENCE.md) for `.MEASURE` syntax and the full range of measurement keywords, [MEASURE-DATABASE-REFERENCE.md](MEASURE-DATABASE-REFERENCE.md) for querying `.STEP`'ed results from the SQLite `.db` file*
 ---
 
 *Documentation source: [github.com/analogdevicesinc/ltspice-reference](https://github.com/analogdevicesinc/ltspice-reference)*

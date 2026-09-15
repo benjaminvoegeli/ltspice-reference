@@ -240,6 +240,9 @@ dataset.
 **Script file**: can be a plain netlist — LTspice reads only the `.MEAS` statements and
 ignores every other line, so the circuit's own `.net` or `.cir` file works as-is.
 
+**Accuracy**: results are limited by the accuracy of the waveform data *after*
+compression. Disable compression for precise measurements:
+
 ```spice
 .options plotwinsize=0   ; disable compression
 ```
