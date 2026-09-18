@@ -1,7 +1,7 @@
 ---
 title: LTspice Troubleshooting Guide
 description: Convergence failures, debugging, and simulator options — diagnosing and fixing common simulation problems.
-version: "24+"
+version: "26+"
 ---
 
 [← AI Reference](README.md)
@@ -15,19 +15,20 @@ Diagnosing and fixing convergence failures, performance issues, and common simul
 ## Table of Contents
 
 1. [Diagnostic Information Collection](#diagnostic-information-collection)
-2. [Convergence Problems — Symptoms](#convergence-problems--symptoms)
-3. [Common Sources of Convergence Failure](#common-sources-of-convergence-failure)
-4. [Debugging with Convergence Reports](#debugging-with-convergence-reports)
-5. [Fix the Circuit](#fix-the-circuit)
-6. [Improve DC Operating Point Convergence](#improve-dc-operating-point-convergence)
-7. [Improve Transient Convergence](#improve-transient-convergence)
-8. [Integration Methods](#integration-methods)
-9. [Use Initial Conditions (UIC)](#use-initial-conditions-uic)
-10. [Waveform Compression](#waveform-compression)
-11. [Steady-State Detection](#steady-state-detection)
-12. [Memory and Performance](#memory-and-performance)
-13. [Sweep Directive Errors](#sweep-directive-errors)
-14. [Blank Bode Plot After .FRA](#blank-bode-plot-after-fra)
+2. [Convergence](#convergence)
+   - [Symptoms of Convergence Failure](#symptoms-of-convergence-failure)
+   - [Common Sources of Convergence Failure](#common-sources-of-convergence-failure)
+   - [Debugging with Convergence Reports](#debugging-with-convergence-reports)
+   - [Fix the Circuit](#fix-the-circuit)
+   - [Improve DC Operating Point Convergence](#improve-dc-operating-point-convergence)
+   - [Improve Transient Convergence](#improve-transient-convergence)
+3. [Integration Methods](#integration-methods)
+4. [Use Initial Conditions (UIC)](#use-initial-conditions-uic)
+5. [Waveform Compression](#waveform-compression)
+6. [Steady-State Detection](#steady-state-detection)
+7. [Memory and Performance](#memory-and-performance)
+8. [Sweep Directive Errors](#sweep-directive-errors)
+9. [Blank Bode Plot After .FRA](#blank-bode-plot-after-fra)
 
 ---
 
@@ -70,9 +71,11 @@ When troubleshooting LTspice issues (especially [FRA](#blank-bode-plot-after-fra
 
 ---
 
-## Convergence Problems — Symptoms
+## Convergence
 
-### Simulation Stops with Errors
+### Symptoms of Convergence Failure
+
+#### Simulation Stops with Errors
 
 | Error Message | Meaning |
 |---------------|---------|
@@ -87,7 +90,7 @@ Convergence Failure: Time step too small; time = 1.0005e-06, timestep = 1.25e-19
 Simulation Failed: Iteration limit reached
 ```
 
-### Simulation Runs but is Slow
+#### Simulation Runs but is Slow
 
 - Very small time steps / slow transient speed
 - Very slow pseudo-transient while finding operating point
@@ -98,9 +101,7 @@ the simulation is healthy and simply takes longer than you want, see
 [Speeding Up Simulations](FAQ-AND-TIPS.md#speeding-up-simulations), which collects the run-time
 measures documented across this reference.
 
----
-
-## Common Sources of Convergence Failure
+### Common Sources of Convergence Failure
 
 1. **Discontinuities in I-V curve** — abrupt changes in device behavior
 2. **Instantaneous changes** — zero rise/fall times
@@ -108,9 +109,7 @@ measures documented across this reference.
 4. **Extremely high-impedance nodes** — nodes with zero capacitance to ground
 5. **Immediate local feedback** — behavioral sources feeding back instantaneously
 
----
-
-## Debugging with Convergence Reports
+### Debugging with Convergence Reports
 
 Enable convergence reporting to identify problem devices and nodes:
 
@@ -123,7 +122,7 @@ Or add as a simulator option:
 .options debugtran
 ```
 
-### Reading the Report
+#### Reading the Report
 
 The report assigns difficulty scores to devices and nodes:
 
@@ -144,20 +143,18 @@ Node Convergence Difficulty Score:
 
 **Note**: Enabling convergence reports slows the simulation.
 
----
-
-## Fix the Circuit
+### Fix the Circuit
 
 These circuit-level changes resolve most convergence problems:
 
-### 1. Add Capacitance to High-Impedance Nodes
+#### 1. Add Capacitance to High-Impedance Nodes
 
 Even tiny capacitance (1f to 1p) helps the simulator:
 ```spice
 C_fix high_z_node 0 1f
 ```
 
-### 2. Avoid Discontinuities
+#### 2. Avoid Discontinuities
 
 **Ideal diodes**: Add/increase the `epsilon` parameter or increase `Ron`:
 ```spice
@@ -171,12 +168,12 @@ A1 in 0 0 0 0 out 0 0 BUF Trise=10n
 
 **Avoid extreme non-physical values** (e.g., diode emission coefficient n=0.001).
 
-### 3. Avoid Instantaneous Feedback
+#### 3. Avoid Instantaneous Feedback
 
 - Don't model a capacitor with a behavioral current source — use Nonlinear Capacitor (`Q=` syntax)
 - Don't connect logic gate output directly back to its input without delay
 
-### 4. Add Series Resistance to Signal Sources
+#### 4. Add Series Resistance to Signal Sources
 
 ```spice
 V1 in 0 PULSE(0 5 0 1n 1n 0.5u 1u) Rser=1 Cpar=1p
@@ -184,13 +181,11 @@ V1 in 0 PULSE(0 5 0 1n 1n 0.5u 1u) Rser=1 Cpar=1p
 
 Not recommended for power supplies or when monitoring source current.
 
----
-
-## Improve DC Operating Point Convergence
+### Improve DC Operating Point Convergence
 
 Try these in order (least to most aggressive):
 
-### Circuit Directives
+#### Circuit Directives
 
 | Method | Syntax | Description |
 |--------|--------|-------------|
@@ -198,7 +193,7 @@ Try these in order (least to most aggressive):
 | Initial condition | `.ic V(node)=<val>` | Force initial node voltage |
 | Startup ramp | `.tran 1m startup` | Ramp external sources from zero over first 20u |
 
-### Simulator Options
+#### Simulator Options
 
 | Option | Default | Try | Effect |
 |--------|---------|-----|--------|
@@ -214,11 +209,9 @@ Try these in order (least to most aggressive):
 .ic V(vout)=3.3 V(sw_node)=12
 ```
 
----
+### Improve Transient Convergence
 
-## Improve Transient Convergence
-
-### Simulator Options (listed in recommended order to try)
+#### Simulator Options (listed in recommended order to try)
 
 Increasing the value of these numerical options (except `itl4`) sacrifices accuracy for the sake of convergence.
 
@@ -238,7 +231,7 @@ Increasing the value of these numerical options (except `itl4`) sacrifices accur
 .options method=gear itl4=50 cshunt=1f
 ```
 
-### State Save/Load for Partial Relaxation
+#### State Save/Load for Partial Relaxation
 
 Temporarily loosen tolerances for startup, then reload state and continue with tight tolerances. Only one `.tran` command can be active at a time — comment out the previous one for each run:
 

@@ -1,7 +1,7 @@
 ---
 title: LTspice FAQ and Tips
 description: Updates, license, Linux, simulation speed, efficiency calculations, and SMPS Bode plots — frequently asked questions and practical tips.
-version: "24+"
+version: "26+"
 ---
 
 [← AI Reference](README.md)
