@@ -93,6 +93,11 @@ Simulation Failed: Iteration limit reached
 - Very slow pseudo-transient while finding operating point
 - Borderline circuits may converge or fail depending on minor changes
 
+These are symptoms of a *convergence* problem — the remedies are in the sections below. If instead
+the simulation is healthy and simply takes longer than you want, see
+[Speeding Up Simulations](FAQ-AND-TIPS.md#speeding-up-simulations), which collects the run-time
+measures documented across this reference.
+
 ---
 
 ## Common Sources of Convergence Failure
@@ -247,6 +252,12 @@ Temporarily loosen tolerances for startup, then reload state and continue with t
 ; .tran 10m loadstate
 ```
 
+`savestate` writes the full solution state of the run to a `.state` file and `loadstate` resumes
+from it. Written as `.tran` options they are the same mechanism as the standalone
+`.savestate`/`.loadstate` directives, and produce interchangeable files — see
+[State Management](SIMULATION-COMMANDS-REFERENCE.md#state-management) for the full syntax,
+including `savestatetime=<time>` to save at a chosen time rather than at the end of the run.
+
 ---
 
 ## Integration Methods
@@ -356,12 +367,21 @@ Stop simulation automatically when steady state is reached.
 ### Tips
 
 - Use `.ic` to set initial node voltages and inductor currents to reduce startup time
+- Combine with `savestate` to capture the settled state — `steady` ends the run at steady state
+  and `savestate` defaults to saving on completion, so `.tran 10m steady savestate` stores the
+  settled state without your having to guess a time for it. Later runs `loadstate` instead of
+  repeating the startup. See
+  [State Management](SIMULATION-COMMANDS-REFERENCE.md#state-management).
 - Each Mark Start execution clears waveform history (helps limit file size)
 - Required for efficiency calculation reports
 
 ---
 
 ## Memory and Performance
+
+This section covers memory and stored data. For run time, see
+[Speeding Up Simulations](FAQ-AND-TIPS.md#speeding-up-simulations) — in particular `loadstate`,
+which avoids simulating the startup transient rather than merely discarding its data.
 
 ### System Requirements
 
@@ -372,7 +392,6 @@ If you can run Windows, you can run LTspice. Significant effort is spent minimiz
 - All waveform data stored on **disk** during simulation
 - Only plotted traces loaded into RAM
 - No particular file size limit — can handle multi-gigabyte `.raw` files
-- Can turn off marching waveforms to reduce memory during simulation
 
 ### Reducing Data Size
 
@@ -389,6 +408,16 @@ If you can run Windows, you can run LTspice. Significant effort is spent minimiz
    ```
 
 4. **Enable waveform compression** (default is disabled)
+
+5. **Skip the startup transient with `loadstate`** — save the state once the circuit has settled,
+   then start later runs from it:
+   ```spice
+   .tran 1m savestate   ; run once
+   .tran 10m loadstate  ; subsequent runs start already settled
+   ```
+   Unlike `Tstart`, which simulates the startup and merely discards the data, this does not
+   simulate it at all — so it saves run time as well as disk. See
+   [State Management](SIMULATION-COMMANDS-REFERENCE.md#state-management).
 
 ### Emergency: Running Out of Disk Space
 
