@@ -1957,7 +1957,7 @@ Because `;§pnba` is introduced by `;`, it is an ordinary comment and is ignored
 **Symbols**: FRA
 
 ```spice
-@xxx in out [zm] fstart=<val> fend=<val> [delay=<val>] [oct=<val>] [fcoarse=<val>]
+@xxx out in [zm] fstart=<val> fend=<val> [delay=<val>] [oct=<val>] [fcoarse=<val>]
 + [nmax=<val>] [[pp0=<val>] [[pp1=<val>] [f0=<val> f1=<val>]]] [tavgmin=<val>]
 + [tsettle=<val>] [rpar=<val>] [flist=<values>] [acmag=<val>] [acphase=<val>]
 + [refnode=<netname>] [intnode=<netname>]
@@ -3521,11 +3521,7 @@ Mirroring also swaps which pin lands left versus right, so re-derive every pin a
 
 ### Standard Symbol Geometry (local coordinates)
 
-**Call the `get_symbol_content` MCP tool for any symbol not in the table below.** Pass the symbol name as a `SYMBOL` card spells it — relative path, extension optional, `/` or `\` — and read `keep_out` (the box no wire may cross) and `pins` (each carrying `name`, `x`, `y`, `spice_order` and `exit_direction`) from the response. It resolves names through the same search path the schematic loader uses, so a bare stem such as `LT8609S` resolves as well as `PowerProducts/LT8609S`, and it reports the symbol the user currently has open in the editor, unsaved edits included, in preference to the library copy. A symbol with no geometry and no visible pins has no box to report — a vendor-encrypted part is the case that reaches this in practice — and answers with `keep_out_empty: "true"`, omitting `keep_out`. That is a real outcome rather than an error: treat the drawn extent as unknown and route with generous clearance, rather than reading it as an empty box.
-
-**Do not obtain symbol geometry any other way.** Not by reading the `.asy` file, not by parsing its `LINE`/`RECTANGLE`/`CIRCLE`/`ARC` numbers, not by copying a similar-looking part, and not by reasoning about how the symbol is drawn. Those numbers do not mean what they appear to: an `ARC`'s first four bound a construction ellipse that can be far larger than the curve drawn inside it. Nor does a shared pin set imply a shared body — `LED` carries `diode`'s pins exactly, on a body 40 px wider.
-
-The table below is a cached copy of the tool's own output for the primitives, so routine work needs no round trip. Each pin reads `name[n] = (px, py)` followed by its exit direction, where `n` is the **SPICE netlist order** — the position the pin occupies on the generated netlist line. Placement alone does not tell you node order, so for any device with three or more pins the bracketed number is what matters. Exit arrows are local directions at R0, remembering that **+y points down**: ↑ up, ↓ down, ← left, → right. **Keep-out** is the box a wire must stay out of, also local at R0. It unions the drawn ink with every visible pin anchor and **excludes** attribute text, which is why `voltage`'s box starts at its `+` pin rather than at the circle 8 px below it, and why clearing text is a separate rule with its own margin ([Text Keep-Out](#text-keep-out)). These are the tool's own figures, so a few edges land **off-grid** (`ind` at x=5, `FerriteBead2` at ±9) where a sampled arc stops between grid lines. That is the real edge; do not round it outward and then treat the rounded box as authoritative.
+**The table below is the first and, for the symbols it lists, the only source of symbol geometry you need.** It is a cached copy of the `get_symbol_content` tool's own output for the primitives, so routine work needs neither a round trip nor a file read. Each pin reads `name[n] = (px, py)` followed by its exit direction, where `n` is the **SPICE netlist order** — the position the pin occupies on the generated netlist line. Placement alone does not tell you node order, so for any device with three or more pins the bracketed number is what matters. Exit arrows are local directions at R0, remembering that **+y points down**: ↑ up, ↓ down, ← left, → right. **Keep-out** is the box a wire must stay out of, also local at R0. It unions the drawn ink with every visible pin anchor and **excludes** attribute text, which is why `voltage`'s box starts at its `+` pin rather than at the circle 8 px below it, and why clearing text is a separate rule with its own margin ([Text Keep-Out](#text-keep-out)). These are the tool's own figures, so a few edges land **off-grid** (`ind` at x=5, `FerriteBead2` at ±9) where a sampled arc stops between grid lines. That is the real edge; do not round it outward and then treat the rounded box as authoritative.
 
 | Symbol | Prefix | Keep-out | Pins |
 |--------|--------|----------|------|
@@ -3583,6 +3579,14 @@ The table below is a cached copy of the tool's own output for the primitives, so
 - `polcap` pin names are `A` and `B`, not `+` and `-`, even though the body is drawn polarized. `A[1]` is the positive terminal.
 - The `ISO*` automotive transient sources netlist with prefix **`X`** (a subcircuit), not `V`.
 
+#### Symbols Not in the Table
+
+**Everything in this subsection applies only to a symbol the table above does not list.** For a listed symbol the row *is* the answer: do not call a tool, read a file, or re-derive what is already tabulated, and do not let either source argue you out of the row.
+
+**For an unlisted symbol, call the `get_symbol_content` MCP tool — where the client has it.** That tool is served by the desktop LTspice MCP bridge, which ships with LTspice 26.1.2 and later; a client with no MCP connection, or one talking to an older LTspice, does not have it at all. Pass the symbol name as a `SYMBOL` card spells it — relative path, extension optional, `/` or `\` — and read `keep_out` (the box no wire may cross) and `pins` (each carrying `name`, `x`, `y`, `spice_order` and `exit_direction`) from the response. It resolves names through the same search path the schematic loader uses, so a bare stem such as `LT8609S` resolves as well as `PowerProducts/LT8609S`, and it reports the symbol the user currently has open in the editor, unsaved edits included, in preference to the library copy. A symbol with no geometry and no visible pins has no box to report — a vendor-encrypted part is the case that reaches this in practice — and answers with `keep_out_empty: "true"`, omitting `keep_out`. That is a real outcome rather than an error: treat the drawn extent as unknown and route with generous clearance, rather than reading it as an empty box.
+
+**When the `get_symbol_content` MCP tool is available, do not obtain symbol geometry any other way.** Not by reading the `.asy` file, not by parsing its `LINE`/`RECTANGLE`/`CIRCLE`/`ARC` numbers, not by copying a similar-looking part, and not by reasoning about how the symbol is drawn. Those numbers do not mean what they appear to: an `ARC`'s first four bound a construction ellipse that can be far larger than the curve drawn inside it. Nor does a shared pin set imply a shared body — `LED` carries `diode`'s pins exactly, on a body 40 px wider.
+
 #### Symbol Names and Library Layout
 
 Symbols install under `%LOCALAPPDATA%\LTspice\lib\sym\`, and **that directory is not flat.** Only the passives, sources, and primitives tabulated above sit in `sym\` itself; the vast majority of installed symbols are one or more levels down, so `sym\<name>.asy` will not resolve for a real device:
@@ -3600,7 +3604,7 @@ Symbols install under `%LOCALAPPDATA%\LTspice\lib\sym\`, and **that directory is
 
 The set of subdirectories varies with the install and with any vendor libraries added since, so treat the list as a starting point rather than a fixed inventory.
 
-Do not go looking for the folder. `get_symbol_content` accepts a bare stem, resolves it through the loader's own search order, and returns the resolved absolute `path` — which is where the subdirectory spelling for a `SYMBOL` card comes from.
+Do not go looking for the folder. Where it is available, `get_symbol_content` accepts a bare stem, resolves it through the loader's own search order, and returns the resolved absolute `path` — which is where the subdirectory spelling for a `SYMBOL` card comes from.
 
 The subdirectory is part of how the symbol is referenced, not just where it happens to be filed. A `SYMBOL` line carries the path relative to `sym\`, with each separator written as a **doubled** backslash:
 
