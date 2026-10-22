@@ -2137,7 +2137,7 @@ Simulates circuit behavior over time when powered up.
 | step | Compute step response |
 | convreport | Add convergence scores to log |
 
-**State file options**: `loadstate[=<file>]`, `savestate[=<file>]`, `savestatetime=<time>` — the same mechanism as the standalone `.savestate`/`.loadstate` directives; see [State Management](#state-management).
+**State file options**: `loadstate[="<file>"]`, `savestate[="<file>"]`, `savestatetime=<time>` — the file name must be enclosed in double quotes; the same mechanism as the standalone `.savestate`/`.loadstate` directives; see [State Management](#state-management).
 
 **Examples**:
 ```spice
@@ -2277,7 +2277,7 @@ Time-domain frequency response analysis for feedback loops (e.g., SMPS stability
 
 ```spice
 .fra [Tstart=<val>] [dTmax=<val>] [Tstep=<val>] [Tstop=<val>]
-+ [uic] [startup] [loadstate[=<file>]] [savestate[=<file>]] [savestatetime=<time>]
++ [uic] [startup] [loadstate[="<file>"]] [savestate[="<file>"]] [savestatetime=<time>]
 ```
 
 All parameters optional, specified by keyword. FRA automatically stops when all FRA devices complete analysis. The state file options are identical to `.tran`'s, and the state files are interchangeable between the two analyses — see [State Management](#state-management).
@@ -2814,11 +2814,12 @@ files produced by either form are identical and fully interchangeable, including
 
 | Standalone directive | Equivalent option on `.tran` / `.fra` |
 |----------------------|---------------------------------------|
-| `.savestate <filename>` | `savestate=<file>` |
+| `.savestate "<filename>"` | `savestate="<file>"` |
 | `.savestate time=<value>` | `savestatetime=<time>` |
-| `.loadstate <filename>` | `loadstate=<file>` |
+| `.loadstate "<filename>"` | `loadstate="<file>"` |
 
-`.tran` and `.fra` accept exactly the same state syntax as each other. `reset` is the one exception
+In both forms the file name must be enclosed in double quotes. `.tran` and `.fra` accept exactly
+the same state syntax as each other. `reset` is the one exception
 to the mapping: it has **no option form**, and is available only on the standalone `.loadstate`
 directive.
 
@@ -2829,9 +2830,10 @@ directive.
 Saves complete transient simulation state in proprietary format.
 
 ```spice
-.savestate [<filename>] [time=<value>]
+.savestate ["<filename>"] [time=<value>]
 ```
 
+- The file name must be enclosed in double quotes, e.g. `.savestate "settled.state"`
 - Default filename: schematic base name with `.state` extension
 - Default time: saves final state on completion
 - Multiple .savestate allowed in one simulation
@@ -2843,9 +2845,10 @@ Saves complete transient simulation state in proprietary format.
 Restores previously saved state to resume simulation.
 
 ```spice
-.loadstate [<filename>] [reset]
+.loadstate ["<filename>"] [reset]
 ```
 
+- The file name must be enclosed in double quotes, e.g. `.loadstate "settled.state"`
 - `reset`: Plot output starting at time zero
 - The state must be loaded into the same circuit it was saved from — but component and parameter
   *values* may differ, see
